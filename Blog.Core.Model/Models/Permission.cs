@@ -32,11 +32,26 @@ namespace Blog.Core.Model.Models
         /// 是否是按钮
         /// </summary>
         public bool IsButton { get; set; } = false;
+        /// <summary>
+        /// 是否是隐藏菜单
+        /// </summary>
+        [SugarColumn(IsNullable = true)]
+        public bool? IsHide { get; set; } = false;
+
+
+        /// <summary>
+        /// 按钮事件
+        /// </summary>
+        [SugarColumn(IsNullable = true)]
+        public string Func { get; set; }
+
+
 
         /// <summary>
         /// 上一级菜单（0表示上一级无菜单）
         /// </summary>
         public int Pid { get; set; }
+
 
         /// <summary>
         /// 接口api

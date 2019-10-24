@@ -1,32 +1,41 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Blog.Core.IServices;
 using Blog.Core.Model;
 using Blog.Core.Model.Models;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Core.Controllers
 {
+    /// <summary>
+    /// 类别管理【无权限】
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class TopicController : ControllerBase
     {
-        ITopicServices _topicServices;
+        readonly ITopicServices _topicServices;
 
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="topicServices"></param>
         public TopicController(ITopicServices topicServices)
         {
             _topicServices = topicServices;
         }
 
+        /// <summary>
+        /// 获取Tibug所有分类
+        /// </summary>
+        /// <returns></returns>
         // GET: api/Topic
         [HttpGet]
         public async Task<MessageModel<List<Topic>>> Get()
         {
-            var data = new MessageModel<List<Topic>>();
-            data.response = await _topicServices.GetTopics();
+            var data = new MessageModel<List<Topic>> {response = await _topicServices.GetTopics()};
             if (data.response != null)
             {
                 data.success = true;

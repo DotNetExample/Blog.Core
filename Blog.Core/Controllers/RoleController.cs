@@ -1,68 +1,57 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Blog.Core.Common.HttpContextUser;
 using Blog.Core.IServices;
 using Blog.Core.Model;
 using Blog.Core.Model.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Blog.Core.Controllers
 {
+    /// <summary>
+    /// 角色管理
+    /// </summary>
     [Route("api/[controller]/[action]")]
     [ApiController]
-    [Authorize("Permission")]
+    [Authorize(Permissions.Name)]
     public class RoleController : ControllerBase
     {
-        IRoleServices _roleServices;
+        readonly IRoleServices _roleServices;
+        readonly IUser _user;
 
-        /// <summary>
-        /// 构造函数
-        /// </summary>
-        /// <param name="roleServices"></param>
-        public RoleController(IRoleServices roleServices )
+     
+        public RoleController(IRoleServices roleServices, IUser user)
         {
             _roleServices = roleServices;
+            _user = user;
         }
 
+        /// <summary>
+        /// 获取全部角色
+        /// </summary>
+        /// <param name="page"></param>
+        /// <param name="key"></param>
+        /// <returns></returns>
         // GET: api/User
         [HttpGet]
         public async Task<MessageModel<PageModel<Role>>> Get(int page = 1, string key = "")
         {
-            var data = new MessageModel<PageModel<Role>>();
-            int intTotalCount = 50;
-            int TotalCount = 0;
-            int PageCount = 1;
-            List<Role> Roles = new List<Role>();
-
-            Roles = await _roleServices.Query(a => a.IsDeleted != true );
-
-            if (!string.IsNullOrEmpty(key))
+            if (string.IsNullOrEmpty(key) || string.IsNullOrWhiteSpace(key))
             {
-                Roles = Roles.Where(t => (t.Name != null && t.Name.Contains(key))).ToList();
+                key = "";
             }
 
+            int intPageSize = 50;
 
-            //筛选后的数据总数
-            TotalCount = Roles.Count;
-            //筛选后的总页数
-            PageCount = (Math.Ceiling(TotalCount.ObjToDecimal() / intTotalCount.ObjToDecimal())).ObjToInt();
-
-            Roles = Roles.OrderByDescending(d => d.Id).Skip((page - 1) * intTotalCount).Take(intTotalCount).ToList();
+            var data = await _roleServices.QueryPage(a => a.IsDeleted != true && (a.Name != null && a.Name.Contains(key)), page, intPageSize, " Id desc ");
 
             return new MessageModel<PageModel<Role>>()
             {
                 msg = "获取成功",
-                success = TotalCount >= 0,
-                response = new PageModel<Role>()
-                {
-                    page = page,
-                    pageCount = PageCount,
-                    dataCount = TotalCount,
-                    data = Roles,
-                }
+                success = data.dataCount >= 0,
+                response = data
             };
 
         }
@@ -74,13 +63,21 @@ namespace Blog.Core.Controllers
             return "value";
         }
 
+        /// <summary>
+        /// 添加角色
+        /// </summary>
+        /// <param name="role"></param>
+        /// <returns></returns>
         // POST: api/User
         [HttpPost]
-        public async Task<MessageModel<string>> Post([FromBody] Role Role)
+        public async Task<MessageModel<string>> Post([FromBody] Role role)
         {
             var data = new MessageModel<string>();
 
-            var id = (await _roleServices.Add(Role));
+            role.CreateId = _user.ID;
+            role.CreateBy = _user.Name;
+
+            var id = (await _roleServices.Add(role));
             data.success = id > 0;
             if (data.success)
             {
@@ -91,24 +88,34 @@ namespace Blog.Core.Controllers
             return data;
         }
 
+        /// <summary>
+        /// 更新角色
+        /// </summary>
+        /// <param name="role"></param>
+        /// <returns></returns>
         // PUT: api/User/5
         [HttpPut]
-        public async Task<MessageModel<string>> Put([FromBody] Role Role)
+        public async Task<MessageModel<string>> Put([FromBody] Role role)
         {
             var data = new MessageModel<string>();
-            if (Role != null && Role.Id > 0)
+            if (role != null && role.Id > 0)
             {
-                data.success = await _roleServices.Update(Role);
+                data.success = await _roleServices.Update(role);
                 if (data.success)
                 {
                     data.msg = "更新成功";
-                    data.response = Role?.Id.ObjToString();
+                    data.response = role?.Id.ObjToString();
                 }
             }
 
             return data;
         }
 
+        /// <summary>
+        /// 删除角色
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         // DELETE: api/ApiWithActions/5
         [HttpDelete]
         public async Task<MessageModel<string>> Delete(int id)
@@ -116,7 +123,7 @@ namespace Blog.Core.Controllers
             var data = new MessageModel<string>();
             if (id > 0)
             {
-                var userDetail = await _roleServices.QueryByID(id);
+                var userDetail = await _roleServices.QueryById(id);
                 userDetail.IsDeleted = true;
                 data.success = await _roleServices.Update(userDetail);
                 if (data.success)

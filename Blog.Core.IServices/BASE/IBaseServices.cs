@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Blog.Core.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text;
@@ -9,8 +10,8 @@ namespace Blog.Core.IServices.BASE
     public interface IBaseServices<TEntity> where TEntity : class
     {
 
-        Task<TEntity> QueryByID(object objId);
-        Task<TEntity> QueryByID(object objId, bool blnUseCache = false);
+        Task<TEntity> QueryById(object objId);
+        Task<TEntity> QueryById(object objId, bool blnUseCache = false);
         Task<List<TEntity>> QueryByIDs(object[] lstIds);
 
         Task<int> Add(TEntity model);
@@ -41,7 +42,12 @@ namespace Blog.Core.IServices.BASE
         Task<List<TEntity>> Query(string strWhere, int intPageIndex, int intPageSize, string strOrderByFileds);
 
 
-        Task<List<TEntity>> QueryPage(Expression<Func<TEntity, bool>> whereExpression, int intPageIndex = 0, int intPageSize = 20, string strOrderByFileds = null);
+        Task<PageModel<TEntity>> QueryPage(Expression<Func<TEntity, bool>> whereExpression, int intPageIndex = 1, int intPageSize = 20, string strOrderByFileds = null);
+
+        Task<List<TResult>> QueryMuch<T, T2, T3, TResult>(
+            Expression<Func<T, T2, T3, object[]>> joinExpression,
+            Expression<Func<T, T2, T3, TResult>> selectExpression,
+            Expression<Func<T, T2, T3, bool>> whereLambda = null) where T : class, new();
     }
 
 }

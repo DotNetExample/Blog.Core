@@ -1,7 +1,6 @@
 ﻿using Blog.Core.Common;
 using Castle.DynamicProxy;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -10,18 +9,17 @@ namespace Blog.Core.AOP
     /// <summary>
     /// 面向切面的缓存使用
     /// </summary>
-    public class BlogRedisCacheAOP : IInterceptor
+    public class BlogRedisCacheAOP : CacheAOPbase
     {
         //通过注入的方式，把缓存操作接口通过构造函数注入
-        private IRedisCacheManager _cache;
+        private readonly IRedisCacheManager _cache;
         public BlogRedisCacheAOP(IRedisCacheManager cache)
         {
             _cache = cache;
         }
-
-
+        
         //Intercept方法是拦截的关键所在，也是IInterceptor接口中的唯一定义
-        public void Intercept(IInvocation invocation)
+        public override void Intercept(IInvocation invocation)
         {
             var method = invocation.MethodInvocationTarget ?? invocation.Method;
             //对当前方法的特性验证
@@ -43,10 +41,10 @@ namespace Blog.Core.AOP
                         return;
                     }
                     object response;
-                    if (type != null && typeof(Task).IsAssignableFrom(type))
+                    if (typeof(Task).IsAssignableFrom(type))
                     {
                         //返回Task<T>
-                        if (resultTypes.Count() > 0)
+                        if (resultTypes.Any())
                         {
                             var resultType = resultTypes.FirstOrDefault();
                             // 核心1，直接获取 dynamic 类型
@@ -65,7 +63,7 @@ namespace Blog.Core.AOP
                     else
                     {
                         // 核心2，要进行 ChangeType
-                        response = System.Convert.ChangeType(_cache.Get<object>(cacheKey), type);
+                        response = Convert.ChangeType(_cache.Get<object>(cacheKey), type);
                     }
 
                     invocation.ReturnValue = response;
@@ -81,7 +79,7 @@ namespace Blog.Core.AOP
 
                     //Type type = invocation.ReturnValue?.GetType();
                     var type = invocation.Method.ReturnType;
-                    if (type != null && typeof(Task).IsAssignableFrom(type))
+                    if (typeof(Task).IsAssignableFrom(type))
                     {
                         var resultProperty = type.GetProperty("Result");
                         response = resultProperty.GetValue(invocation.ReturnValue);
@@ -99,35 +97,6 @@ namespace Blog.Core.AOP
             {
                 invocation.Proceed();//直接执行被拦截方法
             }
-        }
-
-
-
-        //自定义缓存键
-        private string CustomCacheKey(IInvocation invocation)
-        {
-            var typeName = invocation.TargetType.Name;
-            var methodName = invocation.Method.Name;
-            var methodArguments = invocation.Arguments.Select(GetArgumentValue).Take(3).ToList();//获取参数列表，最多三个
-
-            string key = $"{typeName}:{methodName}:";
-            foreach (var param in methodArguments)
-            {
-                key += $"{param}:";
-            }
-
-            return key.TrimEnd(':');
-        }
-        //object 转 string
-        private string GetArgumentValue(object arg)
-        {
-            if (arg is int || arg is long || arg is string)
-                return arg.ToString();
-
-            if (arg is DateTime)
-                return ((DateTime)arg).ToString("yyyyMMddHHmmss");
-
-            return "";
         }
     }
 
