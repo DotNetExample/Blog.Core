@@ -2,6 +2,7 @@
 using Blog.Core.Hubs;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SignalR;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -24,7 +25,7 @@ namespace Blog.Core.Common.LogHelper
             _contentRoot = contentPath;
         }
 
-        public static void OutSql2Log(string filename, string[] dataParas)
+        public static void OutSql2Log(string filename, string[] dataParas, bool IsHeader = true)
         {
             try
             {
@@ -42,11 +43,15 @@ namespace Blog.Core.Common.LogHelper
                 string logFilePath = Path.Combine(path, $@"{filename}.log");
 
                 var now = DateTime.Now;
-                var logContent = (
-                    "--------------------------------\r\n" +
-                    DateTime.Now + "|\r\n" +
-                    String.Join("\r\n", dataParas) + "\r\n"
-                    );
+                string logContent = String.Join("\r\n", dataParas);
+                if (IsHeader)
+                {
+                    logContent = (
+                       "--------------------------------\r\n" +
+                       DateTime.Now + "|\r\n" +
+                       String.Join("\r\n", dataParas) + "\r\n"
+                       );
+                }
 
                 File.AppendAllText(logFilePath, logContent);
                 WritedCount++;
@@ -103,68 +108,91 @@ namespace Blog.Core.Common.LogHelper
             List<LogInfo> excLogs = new List<LogInfo>();
             List<LogInfo> sqlLogs = new List<LogInfo>();
             List<LogInfo> reqresLogs = new List<LogInfo>();
+
             try
             {
-                aopLogs = ReadLog(Path.Combine(_contentRoot, "Log", "AOPLog.log"), Encoding.UTF8)
-                .Split("--------------------------------")
-                .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
-                .Select(d => new LogInfo
+                var aoplogContent = ReadLog(Path.Combine(_contentRoot, "Log", "AOPLog.log"), Encoding.UTF8);
+
+                if (!string.IsNullOrEmpty(aoplogContent))
                 {
-                    Datetime = d.Split("|")[0].ObjToDate(),
-                    Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
-                    LogColor = "AOP",
+                    aopLogs = aoplogContent.Split("--------------------------------")
+                 .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
+                 .Select(d => new LogInfo
+                 {
+                     Datetime = d.Split("|")[0].ObjToDate(),
+                     Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
+                     LogColor = "AOP",
+                 }).ToList();
+                }
+            }
+            catch (Exception) { }
+
+            try
+            {
+                var exclogContent = ReadLog(Path.Combine(_contentRoot, "Log", $"GlobalExcepLogs_{DateTime.Now.ToString("yyyMMdd")}.log"), Encoding.UTF8);
+
+                if (!string.IsNullOrEmpty(exclogContent))
+                {
+                    excLogs = exclogContent.Split("--------------------------------")
+                                 .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
+                                 .Select(d => new LogInfo
+                                 {
+                                     Datetime = (d.Split("|")[0]).Split(',')[0].ObjToDate(),
+                                     Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
+                                     LogColor = "EXC",
+                                     Import = 9,
+                                 }).ToList();
+                }
+            }
+            catch (Exception) { }
+
+
+            try
+            {
+                var sqllogContent = ReadLog(Path.Combine(_contentRoot, "Log", "SqlLog.log"), Encoding.UTF8);
+
+                if (!string.IsNullOrEmpty(sqllogContent))
+                {
+                    sqlLogs = sqllogContent.Split("--------------------------------")
+                                  .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
+                                  .Select(d => new LogInfo
+                                  {
+                                      Datetime = d.Split("|")[0].ObjToDate(),
+                                      Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
+                                      LogColor = "SQL",
+                                  }).ToList();
+                }
+            }
+            catch (Exception) { }
+
+            //try
+            //{
+            //    reqresLogs = ReadLog(Path.Combine(_contentRoot, "Log", "RequestResponseLog.log"), Encoding.UTF8)?
+            //          .Split("--------------------------------")
+            //          .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
+            //          .Select(d => new LogInfo
+            //          {
+            //              Datetime = d.Split("|")[0].ObjToDate(),
+            //              Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
+            //              LogColor = "ReqRes",
+            //          }).ToList();
+            //}
+            //catch (Exception)
+            //{
+            //}
+
+            try
+            {
+                var Logs = JsonConvert.DeserializeObject<List<RequestInfo>>("[" + ReadLog(Path.Combine(_contentRoot, "Log", "RequestIpInfoLog.log"), Encoding.UTF8) + "]");
+
+                Logs = Logs.Where(d => d.Datetime.ObjToDate() >= DateTime.Today).ToList();
+
+                reqresLogs = Logs.Select(d => new LogInfo
+                {
+                    Datetime = d.Datetime.ObjToDate(),
+                    Content = $"IP:{d.Ip}<br>{d.Url}",
+                    LogColor = "ReqRes",
                 }).ToList();
-
-            }
-            catch (Exception)
-            {
-            }
-
-            try
-            {
-                excLogs = ReadLog(Path.Combine(_contentRoot, "Log", $"GlobalExcepLogs_{DateTime.Now.ToString("yyyMMdd")}.log"), Encoding.UTF8)?
-                      .Split("--------------------------------")
-                      .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
-                      .Select(d => new LogInfo
-                      {
-                          Datetime = (d.Split("|")[0]).Split(',')[0].ObjToDate(),
-                          Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
-                          LogColor = "EXC",
-                          Import = 9,
-                      }).ToList();
-            }
-            catch (Exception)
-            {
-            }
-
-
-            try
-            {
-                sqlLogs = ReadLog(Path.Combine(_contentRoot, "Log", "SqlLog.log"), Encoding.UTF8)
-                      .Split("--------------------------------")
-                      .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
-                      .Select(d => new LogInfo
-                      {
-                          Datetime = d.Split("|")[0].ObjToDate(),
-                          Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
-                          LogColor = "SQL",
-                      }).ToList();
-            }
-            catch (Exception)
-            {
-            }
-
-            try
-            {
-                reqresLogs = ReadLog(Path.Combine(_contentRoot, "Log", "RequestResponseLog.log"), Encoding.UTF8)
-                      .Split("--------------------------------")
-                      .Where(d => !string.IsNullOrEmpty(d) && d != "\n" && d != "\r\n")
-                      .Select(d => new LogInfo
-                      {
-                          Datetime = d.Split("|")[0].ObjToDate(),
-                          Content = d.Split("|")[1]?.Replace("\r\n", "<br>"),
-                          LogColor = "ReqRes",
-                      }).ToList();
             }
             catch (Exception)
             {
@@ -187,14 +215,138 @@ namespace Blog.Core.Common.LogHelper
             return aopLogs;
         }
 
+
+        public static RequestApiWeekView RequestApiinfoByWeek()
+        {
+            List<RequestInfo> Logs = new List<RequestInfo>();
+            List<ApiWeek> apiWeeks = new List<ApiWeek>();
+            string apiWeeksJson = string.Empty;
+            List<string> columns = new List<string>();
+            columns.Add("日期");
+
+
+            try
+            {
+                Logs = JsonConvert.DeserializeObject<List<RequestInfo>>("[" + ReadLog(Path.Combine(_contentRoot, "Log", "RequestIpInfoLog.log"), Encoding.UTF8) + "]");
+
+                var ddd = Logs.Where(d => d.Week == "周日").ToList();
+
+                apiWeeks = (from n in Logs
+                            group n by new { n.Week, n.Url } into g
+                            select new ApiWeek
+                            {
+                                week = g.Key.Week,
+                                url = g.Key.Url,
+                                count = g.Count(),
+                            }).ToList();
+
+                //apiWeeks = apiWeeks.OrderByDescending(d => d.count).Take(8).ToList();
+
+            }
+            catch (Exception)
+            {
+            }
+
+            StringBuilder jsonBuilder = new StringBuilder();
+            jsonBuilder.Append("[");
+
+            var weeks = apiWeeks.GroupBy(x => new { x.week }).Select(s => s.First()).ToList();
+            foreach (var week in weeks)
+            {
+                var apiweeksCurrentWeek = apiWeeks.Where(d => d.week == week.week).OrderByDescending(d => d.count).Take(8).ToList();
+                jsonBuilder.Append("{");
+
+                jsonBuilder.Append("\"");
+                jsonBuilder.Append("日期");
+                jsonBuilder.Append("\":\"");
+                jsonBuilder.Append(week.week);
+                jsonBuilder.Append("\",");
+
+                foreach (var item in apiweeksCurrentWeek)
+                {
+                    jsonBuilder.Append("\"");
+                    jsonBuilder.Append(item.url);
+                    jsonBuilder.Append("\":\"");
+                    jsonBuilder.Append(item.count);
+                    jsonBuilder.Append("\",");
+                }
+                jsonBuilder.Remove(jsonBuilder.Length - 1, 1);
+                jsonBuilder.Append("},");
+            }
+
+            jsonBuilder.Remove(jsonBuilder.Length - 1, 1);
+            jsonBuilder.Append("]");
+
+            columns.AddRange(apiWeeks.OrderByDescending(d => d.count).Take(8).Select(d => d.url).ToList());
+
+            return new RequestApiWeekView()
+            {
+                columns = columns,
+                rows = jsonBuilder.ToString(),
+            };
+        }
+
+        public static AccessApiDateView AccessApiByDate()
+        {
+            List<RequestInfo> Logs = new List<RequestInfo>();
+            List<ApiDate> apiDates = new List<ApiDate>();
+            try
+            {
+                Logs = JsonConvert.DeserializeObject<List<RequestInfo>>("[" + ReadLog(Path.Combine(_contentRoot, "Log", "RequestIpInfoLog.log"), Encoding.UTF8) + "]");
+
+                apiDates = (from n in Logs
+                            group n by new { n.Date } into g
+                            select new ApiDate
+                            {
+                                date = g.Key.Date,
+                                count = g.Count(),
+                            }).ToList();
+
+                apiDates = apiDates.OrderByDescending(d => d.date).Take(7).ToList();
+
+            }
+            catch (Exception)
+            {
+            }
+
+            return new AccessApiDateView()
+            {
+                columns = new string[] { "date", "count" },
+                rows = apiDates.OrderBy(d => d.date).ToList(),
+            };
+        }
+
+        public static AccessApiDateView AccessApiByHour()
+        {
+            List<RequestInfo> Logs = new List<RequestInfo>();
+            List<ApiDate> apiDates = new List<ApiDate>();
+            try
+            {
+                Logs = JsonConvert.DeserializeObject<List<RequestInfo>>("[" + ReadLog(Path.Combine(_contentRoot, "Log", "RequestIpInfoLog.log"), Encoding.UTF8) + "]");
+
+                apiDates = (from n in Logs
+                            where n.Datetime.ObjToDate() >= DateTime.Today
+                            group n by new { hour = n.Datetime.ObjToDate().Hour } into g
+                            select new ApiDate
+                            {
+                                date = g.Key.hour.ToString("00"),
+                                count = g.Count(),
+                            }).ToList();
+
+                apiDates = apiDates.OrderBy(d => d.date).Take(24).ToList();
+
+            }
+            catch (Exception)
+            {
+            }
+
+            return new AccessApiDateView()
+            {
+                columns = new string[] { "date", "count" },
+                rows = apiDates,
+            };
+        }
     }
 
-    public class LogInfo
-    {
-        public DateTime Datetime { get; set; }
-        public string Content { get; set; }
-        public string IP { get; set; }
-        public string LogColor { get; set; }
-        public int Import { get; set; } = 0;
-    }
+
 }

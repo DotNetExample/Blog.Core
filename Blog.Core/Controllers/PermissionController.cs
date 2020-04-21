@@ -139,6 +139,63 @@ namespace Blog.Core.Controllers
 
         }
 
+        /// <summary>
+        /// 查询树形 Table
+        /// </summary>
+        /// <param name="f">父节点</param>
+        /// <param name="key">关键字</param>
+        /// <returns></returns>
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<MessageModel<List<Permission>>> GetTreeTable(int f = 0, string key = "")
+        {
+            List<Permission> permissions = new List<Permission>();
+            var apiList = await _moduleServices.Query(d => d.IsDeleted == false);
+            var permissionsList = await _permissionServices.Query(d => d.IsDeleted == false);
+            if (string.IsNullOrEmpty(key) || string.IsNullOrWhiteSpace(key))
+            {
+                key = "";
+            }
+
+            if (key != "")
+            {
+                permissions = permissionsList.Where(a => a.Name.Contains(key)).OrderBy(a => a.OrderSort).ToList();
+            }
+            else
+            {
+                permissions = permissionsList.Where(a => a.Pid == f).OrderBy(a => a.OrderSort).ToList();
+            }
+
+            foreach (var item in permissions)
+            {
+                List<int> pidarr = new List<int> { };
+                var parent = permissionsList.FirstOrDefault(d => d.Id == item.Pid);
+
+                while (parent != null)
+                {
+                    pidarr.Add(parent.Id);
+                    parent = permissionsList.FirstOrDefault(d => d.Id == parent.Pid);
+                }
+
+                //item.PidArr = pidarr.OrderBy(d => d).Distinct().ToList();
+
+                pidarr.Reverse();
+                pidarr.Insert(0, 0);
+                item.PidArr = pidarr;
+
+                item.MName = apiList.FirstOrDefault(d => d.Id == item.Mid)?.LinkUrl;
+                item.hasChildren = permissionsList.Where(d => d.Pid == item.Id).Any();
+            }
+
+
+            return new MessageModel<List<Permission>>()
+            {
+                msg = "获取成功",
+                success = permissions.Count >= 0,
+                response = permissions
+            };
+        }
+
         // GET: api/User/5
         [HttpGet("{id}")]
         public string Get(string id)
@@ -289,25 +346,34 @@ namespace Blog.Core.Controllers
 
             var data = new MessageModel<NavigationBar>();
 
-            // 三种方式获取 uid
-            var uidInHttpcontext1 = (from item in _httpContext.HttpContext.User.Claims
-                                     where item.Type == "jti"
-                                     select item.Value).FirstOrDefault().ObjToInt();
-
-            var uidInHttpcontext = (JwtHelper.SerializeJwt(_httpContext.HttpContext.Request.Headers["Authorization"].ObjToString().Replace("Bearer ", "")))?.Uid;
-
-            var uName = _user.Name;
-
-            if (uid > 0 && uid == uidInHttpcontext)
+            var uidInHttpcontext1 = 0;
+            var roleIds = new List<int>();
+            // ids4和jwt切换
+            if (Permissions.IsUseIds4)
             {
-                var roleId = ((await _userRoleServices.Query(d => d.IsDeleted == false && d.UserId == uid)).FirstOrDefault()?.RoleId).ObjToInt();
-                if (roleId > 0)
-                {
-                    var pids = (await _roleModulePermissionServices.Query(d => d.IsDeleted == false && d.RoleId == roleId)).Select(d => d.PermissionId.ObjToInt()).Distinct();
+                // ids4
+                uidInHttpcontext1 = (from item in _httpContext.HttpContext.User.Claims
+                                     where item.Type == "sub"
+                                     select item.Value).FirstOrDefault().ObjToInt();
+                roleIds = (from item in _httpContext.HttpContext.User.Claims
+                           where item.Type == "role"
+                           select item.Value.ObjToInt()).ToList();
+            }
+            else
+            {
+                // jwt
+                uidInHttpcontext1 = ((JwtHelper.SerializeJwt(_httpContext.HttpContext.Request.Headers["Authorization"].ObjToString().Replace("Bearer ", "")))?.Uid).ObjToInt();
+                roleIds = (await _userRoleServices.Query(d => d.IsDeleted == false && d.UserId == uid)).Select(d => d.RoleId.ObjToInt()).Distinct().ToList();
+            }
 
+
+            if (uid > 0 && uid == uidInHttpcontext1)
+            {
+                if (roleIds.Any())
+                {
+                    var pids = (await _roleModulePermissionServices.Query(d => d.IsDeleted == false && roleIds.Contains(d.RoleId))).Select(d => d.PermissionId.ObjToInt()).Distinct();
                     if (pids.Any())
                     {
-                        //var rolePermissionMoudles = (await _permissionServices.Query(d => pids.Contains(d.Id) && d.IsButton == false)).OrderBy(c => c.OrderSort);
                         var rolePermissionMoudles = (await _permissionServices.Query(d => pids.Contains(d.Id))).OrderBy(c => c.OrderSort);
                         var permissionTrees = (from child in rolePermissionMoudles
                                                where child.IsDeleted == false
@@ -320,9 +386,9 @@ namespace Blog.Core.Controllers
                                                    order = child.OrderSort,
                                                    path = child.Code,
                                                    iconCls = child.Icon,
-                                                   Func=child.Func,
+                                                   Func = child.Func,
                                                    IsHide = child.IsHide.ObjToBool(),
-                                                   IsButton=child.IsButton.ObjToBool(),
+                                                   IsButton = child.IsButton.ObjToBool(),
                                                    meta = new NavigationBarMeta
                                                    {
                                                        requireAuth = true,

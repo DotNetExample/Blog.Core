@@ -2,7 +2,9 @@
 using Blog.Core.Hubs;
 using Blog.Core.Model.Models;
 using Castle.DynamicProxy;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Newtonsoft.Json;
 using StackExchange.Profiling;
 using System;
 using System.Collections.Generic;
@@ -20,10 +22,12 @@ namespace Blog.Core.AOP
     public class BlogLogAOP : IInterceptor
     {
         private readonly IHubContext<ChatHub> _hubContext;
-        public BlogLogAOP(IHubContext<ChatHub> hubContext)
+        private readonly IHttpContextAccessor _accessor;
+
+        public BlogLogAOP(IHubContext<ChatHub> hubContext, IHttpContextAccessor accessor)
         {
             _hubContext = hubContext;
-
+            _accessor = accessor;
         }
 
 
@@ -33,8 +37,11 @@ namespace Blog.Core.AOP
         /// <param name="invocation">包含被拦截方法的信息</param>
         public void Intercept(IInvocation invocation)
         {
+            string UserName = _accessor.HttpContext?.User?.Identity?.Name;
+
             //记录被拦截方法信息的日志信息
             var dataIntercept = "" +
+                $"【当前操作用户】：{ UserName} \r\n" +
                 $"【当前执行方法】：{ invocation.Method.Name} \r\n" +
                 $"【携带的参数有】： {string.Join(", ", invocation.Arguments.Select(a => (a ?? "").ToString()).ToArray())} \r\n";
 
@@ -49,15 +56,16 @@ namespace Blog.Core.AOP
                 if (IsAsyncMethod(invocation.Method))
                 {
 
+                    #region 方案一
                     //Wait task execution and modify return value
                     if (invocation.Method.ReturnType == typeof(Task))
                     {
                         invocation.ReturnValue = InternalAsyncHelper.AwaitTaskWithPostActionAndFinally(
                             (Task)invocation.ReturnValue,
-                            async () => await TestActionAsync(invocation),
+                             async () => await SuccessAction(invocation, dataIntercept),/*成功时执行*/
                             ex =>
                             {
-                                LogEx(ex, ref dataIntercept);
+                                LogEx(ex, dataIntercept);
                             });
                     }
                     else //Task<TResult>
@@ -65,54 +73,86 @@ namespace Blog.Core.AOP
                         invocation.ReturnValue = InternalAsyncHelper.CallAwaitTaskWithPostActionAndFinallyAndGetResult(
                          invocation.Method.ReturnType.GenericTypeArguments[0],
                          invocation.ReturnValue,
-                         async () => await TestActionAsync(invocation),
+                          async () => await SuccessAction(invocation, dataIntercept),/*成功时执行*/
                          ex =>
                          {
-                             LogEx(ex, ref dataIntercept);
+                             LogEx(ex, dataIntercept);
                          });
-
                     }
+                    #endregion
 
+
+                    // 如果方案一不行，试试这个方案
+                    #region 方案二
+                    //invocation.ReturnValue = invocation.Method.Invoke(invocation.InvocationTarget,invocation.Arguments) as Task;
+
+                    //var type = invocation.Method.ReturnType;
+                    //var resultProperty = type.GetProperty("Result");
+                    //dataIntercept += ($"【执行完成结果】：{JsonConvert.SerializeObject(resultProperty.GetValue(invocation.ReturnValue))}");
+
+
+                    //Parallel.For(0, 1, e =>
+                    //{
+                    //    LogLock.OutSql2Log("AOPLog", new string[] { dataIntercept });
+                    //});
+                    #endregion
                 }
                 else
                 {// 同步1
 
-
+                    dataIntercept += ($"【执行完成结果】：{invocation.ReturnValue}");
+                    Parallel.For(0, 1, e =>
+                    {
+                        LogLock.OutSql2Log("AOPLog", new string[] { dataIntercept });
+                    });
                 }
             }
             catch (Exception ex)// 同步2
             {
-                LogEx(ex, ref dataIntercept);
+                LogEx(ex, dataIntercept);
 
             }
 
-            dataIntercept += ($"【执行完成结果】：{invocation.ReturnValue}");
-
-            Parallel.For(0, 1, e =>
-            {
-                LogLock.OutSql2Log("AOPLog", new string[] { dataIntercept });
-            });
-
             _hubContext.Clients.All.SendAsync("ReceiveUpdate", LogLock.GetLogData()).Wait();
-
-
         }
 
-        private async Task TestActionAsync(IInvocation invocation)
+        private async Task SuccessAction(IInvocation invocation, string dataIntercept)
         {
-            //Console.WriteLine("Waiting after method execution for " + invocation.MethodInvocationTarget.Name);
-            await Task.Delay(20); // 仅作测试
-            //Console.WriteLine("Waited after method execution for " + invocation.MethodInvocationTarget.Name);
+
+            var type = invocation.Method.ReturnType;
+            if (typeof(Task).IsAssignableFrom(type))
+            {
+                var resultProperty = type.GetProperty("Result");
+                dataIntercept += ($"【执行完成结果】：{JsonConvert.SerializeObject(resultProperty.GetValue(invocation.ReturnValue))}");
+            }
+            else
+            {
+                dataIntercept += ($"【执行完成结果】：{invocation.ReturnValue}");
+            }
+
+            await Task.Run(() =>
+            {
+                Parallel.For(0, 1, e =>
+                {
+                    LogLock.OutSql2Log("AOPLog", new string[] { dataIntercept });
+                });
+            });
         }
 
-        private void LogEx(Exception ex, ref string dataIntercept)
+        private void LogEx(Exception ex, string dataIntercept)
         {
             if (ex != null)
             {
                 //执行的 service 中，收录异常
                 MiniProfiler.Current.CustomTiming("Errors：", ex.Message);
                 //执行的 service 中，捕获异常
-                dataIntercept += ($"方法执行中出现异常：{ex.Message + ex.InnerException}\r\n");
+                dataIntercept += ($"【执行完成结果】：方法中出现异常：{ex.Message + ex.InnerException}\r\n");
+
+                // 异常日志里有详细的堆栈信息
+                Parallel.For(0, 1, e =>
+                {
+                    LogLock.OutSql2Log("AOPLog", new string[] { dataIntercept });
+                });
             }
         }
 

@@ -31,7 +31,8 @@ namespace Blog.Core.AOP
             var method = invocation.MethodInvocationTarget ?? invocation.Method;
             //对当前方法的特性验证
             //如果需要验证
-            if (method.GetCustomAttributes(true).FirstOrDefault(x => x.GetType() == typeof(UseTranAttribute)) is UseTranAttribute) {
+            if (method.GetCustomAttributes(true).FirstOrDefault(x => x.GetType() == typeof(UseTranAttribute)) is UseTranAttribute)
+            {
                 try
                 {
                     Console.WriteLine($"Begin Transaction");
@@ -44,31 +45,11 @@ namespace Blog.Core.AOP
                     // 异步获取异常，先执行
                     if (IsAsyncMethod(invocation.Method))
                     {
-                        if (invocation.Method.ReturnType == typeof(Task))
+                        var result = invocation.ReturnValue;
+                        if (result is Task)
                         {
-                            invocation.ReturnValue = InternalAsyncHelper.AwaitTaskWithPostActionAndFinally(
-                                (Task)invocation.ReturnValue,
-                                async () => await TestActionAsync(invocation),
-                                ex =>
-                                {
-                                    _unitOfWork.RollbackTran();
-
-                                });
+                            Task.WaitAll(result as Task);
                         }
-                        else //Task<TResult>
-                        {
-                            invocation.ReturnValue = InternalAsyncHelper.CallAwaitTaskWithPostActionAndFinallyAndGetResult(
-                             invocation.Method.ReturnType.GenericTypeArguments[0],
-                             invocation.ReturnValue,
-                             async () => await TestActionAsync(invocation),
-                             ex =>
-                             {
-                                 _unitOfWork.RollbackTran();
-
-                             });
-
-                        }
-
                     }
                     _unitOfWork.CommitTran();
 
@@ -86,6 +67,14 @@ namespace Blog.Core.AOP
 
         }
 
+        private async Task SuccessAction(IInvocation invocation)
+        {
+            await Task.Run(() =>
+            {
+                //...
+            });
+        }
+
         public static bool IsAsyncMethod(MethodInfo method)
         {
             return (
@@ -95,6 +84,7 @@ namespace Blog.Core.AOP
         }
         private async Task TestActionAsync(IInvocation invocation)
         {
+            await Task.Run(null);
         }
 
     }

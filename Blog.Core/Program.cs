@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Xml;
 using Autofac.Extensions.DependencyInjection;
 using Blog.Core.Model.Models;
+using log4net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ namespace Blog.Core
 {
     public class Program
     {
+        private static readonly ILog log = LogManager.GetLogger(typeof(Program));
         public static void Main(string[] args)
         {
             XmlDocument log4netConfig = new XmlDocument();
@@ -23,9 +25,6 @@ namespace Blog.Core
                 Assembly.GetEntryAssembly(), typeof(log4net.Repository.Hierarchy.Hierarchy));
 
             log4net.Config.XmlConfigurator.Configure(repo, log4netConfig["log4net"]);
-
-
-
 
             // 生成承载 web 应用程序的 Microsoft.AspNetCore.Hosting.IWebHost。Build是WebHostBuilder最终的目的，将返回一个构造的WebHost，最终生成宿主。
             var host = CreateHostBuilder(args).Build();
@@ -41,16 +40,16 @@ namespace Blog.Core
                     // 从 system.IServicec提供程序获取 T 类型的服务。
                     // 数据库连接字符串是在 Model 层的 Seed 文件夹下的 MyContext.cs 中
                     var configuration = services.GetRequiredService<IConfiguration>();
-                    if (configuration.GetSection("AppSettings")["SeedDBEnabled"].ObjToBool())
+                    if (configuration.GetSection("AppSettings")["SeedDBEnabled"].ObjToBool() || configuration.GetSection("AppSettings")["SeedDBDataEnabled"].ObjToBool())
                     {
                         var myContext = services.GetRequiredService<MyContext>();
-                        DBSeed.SeedAsync(myContext).Wait();
+                        var Env = services.GetRequiredService<IWebHostEnvironment>();
+                        DBSeed.SeedAsync(myContext, Env.WebRootPath).Wait();
                     }
                 }
                 catch (Exception e)
                 {
-                    var logger = loggerFactory.CreateLogger<Program>();
-                    logger.LogError(e, "Error occured seeding the Database.");
+                    log.Error($"Error occured seeding the Database.\n{e.Message}");
                     throw;
                 }
             }
@@ -70,10 +69,6 @@ namespace Blog.Core
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder
-                .ConfigureKestrel(serverOptions =>
-                {
-                    serverOptions.AllowSynchronousIO = true;//启用同步 IO
-                })
                 .UseStartup<Startup>()
                 .UseUrls("http://localhost:8081")
                 .ConfigureLogging((hostingContext, builder) =>

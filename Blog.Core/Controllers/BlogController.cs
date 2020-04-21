@@ -7,6 +7,7 @@ using Blog.Core.Common.Helper;
 using Blog.Core.IServices;
 using Blog.Core.Model;
 using Blog.Core.Model.Models;
+using Blog.Core.Model.ViewModels;
 using Blog.Core.SwaggerHelper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,6 +34,7 @@ namespace Blog.Core.Controllers
         /// </summary>
         /// <param name="blogArticleServices"></param>
         /// <param name="redisCacheManager"></param>
+        /// <param name="logger"></param>
         public BlogController(IBlogArticleServices blogArticleServices, IRedisCacheManager redisCacheManager, ILogger<BlogController> logger)
         {
             _blogArticleServices = blogArticleServices;
@@ -53,7 +55,7 @@ namespace Blog.Core.Controllers
         [AllowAnonymous]
         //[ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
         //[ResponseCache(Duration = 600)]
-        public async Task<object> Get(int id, int page = 1, string bcategory = "技术博文", string key = "")
+        public async Task<MessageModel<PageModel<BlogArticle>>> Get(int id, int page = 1, string bcategory = "技术博文", string key = "")
         {
             int intTotalCount = 6;
             int total;
@@ -64,34 +66,12 @@ namespace Blog.Core.Controllers
                 key = "";
             }
 
-            using (MiniProfiler.Current.Step("开始加载数据："))
-            {
-                try
-                {
-                    if (_redisCacheManager.Get<object>("Redis.Blog") != null)
-                    {
-                        MiniProfiler.Current.Step("从Redis服务器中加载数据：");
-                        blogArticleList = _redisCacheManager.Get<List<BlogArticle>>("Redis.Blog");
-                    }
-                    else
-                    {
-                        MiniProfiler.Current.Step("从MSSQL服务器中加载数据：");
-                        blogArticleList = await _blogArticleServices.Query(a => a.bcategory == bcategory && a.IsDeleted == false);
-                        _redisCacheManager.Set("Redis.Blog", blogArticleList, TimeSpan.FromHours(2));
-                    }
-
-                }
-                catch (Exception e)
-                {
-                    MiniProfiler.Current.CustomTiming("Errors：", "Redis服务未启用，请开启该服务，并且请注意端口号，本项目使用的的6319，而且我的是没有设置密码。" + e.Message);
-                    blogArticleList = await _blogArticleServices.Query(a => a.bcategory == bcategory && a.IsDeleted == false);
-                }
-            }
+            blogArticleList = await _blogArticleServices.Query(a => a.bcategory == bcategory && a.IsDeleted == false);
 
             blogArticleList = blogArticleList.Where(d => (d.btitle != null && d.btitle.Contains(key)) || (d.bcontent != null && d.bcontent.Contains(key))).ToList();
 
             total = blogArticleList.Count();
-            totalCount = blogArticleList.Count() / intTotalCount;
+            totalCount = (Math.Ceiling(total.ObjToDecimal() / intTotalCount.ObjToDecimal())).ObjToInt();
 
             using (MiniProfiler.Current.Step("获取成功后，开始处理最终数据"))
             {
@@ -111,14 +91,18 @@ namespace Blog.Core.Controllers
                 }
             }
 
-            return Ok(new
+            return new MessageModel<PageModel<BlogArticle>>()
             {
                 success = true,
-                page,
-                total,
-                pageCount = totalCount,
-                data = blogArticleList
-            });
+                msg = "获取成功",
+                response = new PageModel<BlogArticle>()
+                {
+                    page = page,
+                    dataCount = total,
+                    data = blogArticleList,
+                    pageCount = totalCount,
+                }
+            };
         }
 
 
@@ -128,15 +112,15 @@ namespace Blog.Core.Controllers
         /// <param name="id"></param>
         /// <returns></returns>
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<object> Get(int id)
+        [Authorize]
+        public async Task<MessageModel<BlogViewModels>> Get(int id)
         {
-            var model = await _blogArticleServices.GetBlogDetails(id);
-            return Ok(new
+            return new MessageModel<BlogViewModels>()
             {
+                msg = "获取成功",
                 success = true,
-                data = model
-            });
+                response = await _blogArticleServices.GetBlogDetails(id)
+            };
         }
 
 
@@ -148,15 +132,15 @@ namespace Blog.Core.Controllers
         [HttpGet]
         [Route("DetailNuxtNoPer")]
         [AllowAnonymous]
-        public async Task<object> DetailNuxtNoPer(int id)
+        public async Task<MessageModel<BlogViewModels>> DetailNuxtNoPer(int id)
         {
             _logger.LogInformation("xxxxxxxxxxxxxxxxxxx");
-            var model = await _blogArticleServices.GetBlogDetails(id);
-            return Ok(new
+            return new MessageModel<BlogViewModels>()
             {
+                msg = "获取成功",
                 success = true,
-                data = model
-            });
+                response = await _blogArticleServices.GetBlogDetails(id)
+            };
         }
 
 
@@ -173,9 +157,14 @@ namespace Blog.Core.Controllers
 
         [CustomRoute(ApiVersions.V2, "Blogtest")]
         [AllowAnonymous]
-        public object V2_Blogtest()
+        public MessageModel<string> V2_Blogtest()
         {
-            return Ok(new { status = 220, data = "我是第二版的博客信息" });
+            return new MessageModel<string>()
+            {
+                msg = "获取成功",
+                success = true,
+                response = "我是第二版的博客信息"
+            };
         }
 
         /// <summary>
@@ -230,5 +219,57 @@ namespace Blog.Core.Controllers
             return data;
         }
 
+
+        /// <summary>
+        /// 更新博客信息
+        /// </summary>
+        /// <param name="BlogArticle"></param>
+        /// <returns></returns>
+        // PUT: api/User/5
+        [HttpPut]
+        [Route("Update")]
+        public async Task<MessageModel<string>> Put([FromBody] BlogArticle BlogArticle)
+        {
+            var data = new MessageModel<string>();
+            if (BlogArticle != null && BlogArticle.bID > 0)
+            {
+                var model = await _blogArticleServices.QueryById(BlogArticle.bID);
+
+                if (model != null)
+                {
+                    model.btitle = BlogArticle.btitle;
+                    model.bcategory = BlogArticle.bcategory;
+                    model.bsubmitter = BlogArticle.bsubmitter;
+                    model.bcontent = BlogArticle.bcontent;
+                    data.success = await _blogArticleServices.Update(model);
+                    if (data.success)
+                    {
+                        data.msg = "更新成功";
+                        data.response = BlogArticle?.bID.ObjToString();
+                    }
+                }
+
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// apache jemeter 压力测试
+        /// 更新接口
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("ApacheTestUpdate")]
+        [AllowAnonymous]
+        public async Task<MessageModel<bool>> ApacheTestUpdate()
+        {
+            return new MessageModel<bool>()
+            {
+                success = true,
+                msg = "更新成功",
+                response = await _blogArticleServices.Update(new { bsubmitter = $"laozhang{DateTime.Now.Millisecond}", bID = 1 })
+            };
+        }
     }
 }

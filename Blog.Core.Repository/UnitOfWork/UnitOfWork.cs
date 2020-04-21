@@ -1,14 +1,18 @@
-﻿using Blog.Core.IRepository.UnitOfWork;
+﻿using Blog.Core.Common;
+using Blog.Core.Common.DB;
+using Blog.Core.Common.LogHelper;
+using Blog.Core.IRepository.UnitOfWork;
 using SqlSugar;
+using StackExchange.Profiling;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Blog.Core.Repository.UnitOfWork
 {
     public class UnitOfWork : IUnitOfWork
     {
-
         private readonly ISqlSugarClient _sqlSugarClient;
 
         public UnitOfWork(ISqlSugarClient sqlSugarClient)
@@ -16,33 +20,37 @@ namespace Blog.Core.Repository.UnitOfWork
             _sqlSugarClient = sqlSugarClient;
         }
 
-        public ISqlSugarClient GetDbClient()
+        /// <summary>
+        /// 获取DB，保证唯一性
+        /// </summary>
+        /// <returns></returns>
+        public SqlSugarClient GetDbClient()
         {
-
-            return _sqlSugarClient;
+            // 必须要as，后边会用到切换数据库操作
+            return _sqlSugarClient as SqlSugarClient;
         }
 
         public void BeginTran()
         {
-            GetDbClient().Ado.BeginTran(); 
+            GetDbClient().BeginTran();
         }
 
         public void CommitTran()
         {
             try
             {
-                GetDbClient().Ado.CommitTran(); //
+                GetDbClient().CommitTran(); //
             }
             catch (Exception ex)
             {
-                GetDbClient().Ado.RollbackTran();
+                GetDbClient().RollbackTran();
                 throw ex;
             }
         }
 
         public void RollbackTran()
         {
-            GetDbClient().Ado.RollbackTran();
+            GetDbClient().RollbackTran();
         }
 
     }

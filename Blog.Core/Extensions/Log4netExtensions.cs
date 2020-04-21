@@ -1,9 +1,6 @@
-﻿using Blog.Core.Common.LogHelper;
+﻿using Blog.Core.Common;
+using Blog.Core.Common.LogHelper;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Blog.Core.Extensions
 {
@@ -17,7 +14,10 @@ namespace Blog.Core.Extensions
 
         public static ILoggerFactory AddLog4Net(this ILoggerFactory factory)
         {
-            factory.AddProvider(new Log4NetProvider("Log4net.config"));
+            if (Appsettings.app("Middleware", "RecordAllLogs", "Enabled").ObjToBool())
+            {
+                factory.AddProvider(new Log4NetProvider("Log4net.config"));
+            }
             return factory;
         }
     }

@@ -29,6 +29,11 @@
             通用返回信息类
             </summary>
         </member>
+        <member name="P:Blog.Core.Model.MessageModel`1.status">
+            <summary>
+            状态码
+            </summary>
+        </member>
         <member name="P:Blog.Core.Model.MessageModel`1.success">
             <summary>
             操作是否成功
@@ -655,6 +660,81 @@
             登录账号
             </summary>
         </member>
+        <member name="T:Blog.Core.Model.Models.TasksQz">
+            <summary>
+            任务计划表
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.Name">
+            <summary>
+            任务名称
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.JobGroup">
+            <summary>
+            任务分组
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.Cron">
+            <summary>
+            任务运行时间表达式
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.AssemblyName">
+            <summary>
+            任务所在DLL对应的程序集名称
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.ClassName">
+            <summary>
+            任务所在类
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.Remark">
+            <summary>
+            任务描述
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.RunTimes">
+            <summary>
+            执行次数
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.BeginTime">
+            <summary>
+            开始时间
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.EndTime">
+            <summary>
+            结束时间
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.TriggerType">
+            <summary>
+            触发器类型（0、simple 1、cron）
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.IntervalSecond">
+            <summary>
+            执行间隔时间, 秒为单位
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.IsStart">
+            <summary>
+            是否启动
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.JobParams">
+            <summary>
+            执行传参
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.Models.TasksQz.CreateTime">
+            <summary>
+            创建时间
+            </summary>
+        </member>
         <member name="T:Blog.Core.Model.Models.Topic">
             <summary>
             Tibug 类别
@@ -715,47 +795,59 @@
             修改时间
             </summary>
         </member>
-        <member name="M:Blog.Core.Model.Models.DBSeed.SeedAsync(Blog.Core.Model.Models.MyContext)">
+        <member name="M:Blog.Core.Model.Models.DBSeed.SeedAsync(Blog.Core.Model.Models.MyContext,System.String)">
             <summary>
             异步添加种子数据
             </summary>
             <param name="myContext"></param>
+            <param name="WebRootPath"></param>
             <returns></returns>
         </member>
-        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateModels(Blog.Core.Model.Models.MyContext)">
+        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateModels(Blog.Core.Model.Models.MyContext,System.String[])">
             <summary>
             生成Model层
             </summary>
-            <param name="myContext"></param>
+            <param name="myContext">上下文</param>
+            <param name="tableNames">数据库表名数组，默认空，生成所有表</param>
             <returns></returns>
         </member>
-        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateIRepositorys(Blog.Core.Model.Models.MyContext)">
+        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateIRepositorys(Blog.Core.Model.Models.MyContext,System.String[])">
             <summary>
             生成IRepository层
             </summary>
-            <param name="myContext"></param>
+            <param name="myContext">上下文</param>
+            <param name="tableNames">数据库表名数组，默认空，生成所有表</param>
             <returns></returns>
         </member>
-        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateIServices(Blog.Core.Model.Models.MyContext)">
+        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateIServices(Blog.Core.Model.Models.MyContext,System.String[])">
             <summary>
             生成 IService 层
             </summary>
-            <param name="myContext"></param>
+            <param name="myContext">上下文</param>
+            <param name="tableNames">数据库表名数组，默认空，生成所有表</param>
             <returns></returns>
         </member>
-        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateRepository(Blog.Core.Model.Models.MyContext)">
+        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateRepository(Blog.Core.Model.Models.MyContext,System.String[])">
             <summary>
             生成 Repository 层
             </summary>
-            <param name="myContext"></param>
+            <param name="myContext">上下文</param>
+            <param name="tableNames">数据库表名数组，默认空，生成所有表</param>
             <returns></returns>
         </member>
-        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateServices(Blog.Core.Model.Models.MyContext)">
+        <member name="M:Blog.Core.Model.Models.FrameSeed.CreateServices(Blog.Core.Model.Models.MyContext,System.String[])">
             <summary>
-            生成 Repository 层
+            生成 Service 层
             </summary>
-            <param name="myContext"></param>
+            <param name="myContext">上下文</param>
+            <param name="tableNames">数据库表名数组，默认空，生成所有表</param>
             <returns></returns>
+        </member>
+        <member name="M:Blog.Core.Model.Models.MyContext.GetMainConnectionDb">
+            <summary>
+            连接字符串 
+            Blog.Core
+            </summary>
         </member>
         <member name="P:Blog.Core.Model.Models.MyContext.ConnectionString">
             <summary>
@@ -837,6 +929,14 @@
             <param name="strNameSpace">命名空间</param>
             <param name="lstTableNames">生产指定的表</param>
             <param name="strInterface">实现接口</param>
+        </member>
+        <member name="M:Blog.Core.Model.Models.MyContext.CreateFilesByClassStringList(System.Collections.Generic.Dictionary{System.String,System.String},System.String,System.String)">
+            <summary>
+            根据模板内容批量生成文件
+            </summary>
+            <param name="ls">类文件字符串list</param>
+            <param name="strPath">生成路径</param>
+            <param name="fileNameTp">文件名格式模板</param>
         </member>
         <member name="M:Blog.Core.Model.Models.MyContext.GetEntityDB``1">
             <summary>
@@ -1150,6 +1250,26 @@
         <member name="T:Blog.Core.Model.ViewModels.SidebarMenuViewModel">
             <summary>
             菜单展示model
+            </summary>
+        </member>
+        <member name="T:Blog.Core.Model.ViewModels.TestRestSharpGetDto">
+            <summary>
+            用来测试 RestSharp Get 请求
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.ViewModels.TestRestSharpGetDto.success">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="P:Blog.Core.Model.ViewModels.TestRestSharpGetDto.data">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="T:Blog.Core.Model.ViewModels.TestRestSharpPostDto">
+            <summary>
+            用来测试 RestSharp Post 请求
             </summary>
         </member>
         <member name="T:Blog.Core.Model.ViewModels.TopgbViewModels">

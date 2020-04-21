@@ -1,13 +1,17 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using AutoMapper;
 using Blog.Core.Common.HttpContextUser;
+using Blog.Core.Common.HttpRestSharp;
+using Blog.Core.Filter;
 using Blog.Core.IServices;
 using Blog.Core.Model;
 using Blog.Core.Model.Models;
+using Blog.Core.Model.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,6 +34,7 @@ namespace Blog.Core.Controllers
         private readonly Love _love;
         private readonly IRoleModulePermissionServices _roleModulePermissionServices;
         private readonly IUser _user;
+        private readonly IPasswordLibServices _passwordLibServices;
         readonly IBlogArticleServices _blogArticleServices;
 
         /// <summary>
@@ -41,7 +46,8 @@ namespace Blog.Core.Controllers
         /// <param name="love"></param>
         /// <param name="roleModulePermissionServices"></param>
         /// <param name="user"></param>
-        public ValuesController(IBlogArticleServices blogArticleServices, IMapper mapper, IAdvertisementServices advertisementServices, Love love, IRoleModulePermissionServices roleModulePermissionServices, IUser user)
+        /// <param name="passwordLibServices"></param>
+        public ValuesController(IBlogArticleServices blogArticleServices, IMapper mapper, IAdvertisementServices advertisementServices, Love love, IRoleModulePermissionServices roleModulePermissionServices, IUser user, IPasswordLibServices passwordLibServices)
         {
             // 测试 Authorize 和 mapper
             _mapper = mapper;
@@ -50,6 +56,8 @@ namespace Blog.Core.Controllers
             _roleModulePermissionServices = roleModulePermissionServices;
             // 测试 Httpcontext
             _user = user;
+            // 测试多库
+            _passwordLibServices = passwordLibServices;
             // 测试AOP加载顺序，配合 return
             _blogArticleServices = blogArticleServices;
         }
@@ -64,20 +72,39 @@ namespace Blog.Core.Controllers
         {
             var data = new MessageModel<ResponseEnum>();
 
+            /*
+             *  测试 sql 更新
+             * 
+             * 【SQL参数】：@bID:5
+             *  @bsubmitter:laozhang619
+             *  @IsDeleted:False
+             * 【SQL语句】：UPDATE `BlogArticle`  SET
+             *  `bsubmitter`=@bsubmitter,`IsDeleted`=@IsDeleted  WHERE `bID`=@bID
+             */
+            var updateSql = await _blogArticleServices.Update(new { bsubmitter = $"laozhang{DateTime.Now.Millisecond}", IsDeleted = false, bID = 5 });
+
+
+            // 测试模拟异常，全局异常过滤器拦截
             var i = 0;
             var d = 3 / i;
 
+
+            // 测试 AOP 缓存
             var blogArticles = await _blogArticleServices.GetBlogs();
 
+
+            // 测试多表联查
             var roleModulePermissions = await _roleModulePermissionServices.QueryMuchTable();
 
+
+            // 测试多个异步执行时间
             var roleModuleTask = _roleModulePermissionServices.Query();
             var listTask = _advertisementServices.Query();
-
             var ad = await roleModuleTask;
             var list = await listTask;
 
 
+            // 测试service层返回异常
             _advertisementServices.ReturnExp();
 
             Love love = null;
@@ -93,6 +120,8 @@ namespace Blog.Core.Controllers
         // GET api/values/5
         [HttpGet("{id}")]
         [AllowAnonymous]
+        //[TypeFilter(typeof(DeleteSubscriptionCache),Arguments =new object[] { "1"})]
+        [TypeFilter(typeof(UseServiceDIAttribute), Arguments = new object[] { "laozhang" })]
         public ActionResult<string> Get(int id)
         {
             var loveu = _love.SayLoveU();
@@ -131,6 +160,28 @@ namespace Blog.Core.Controllers
             };
         }
 
+        /// <summary>
+        /// to redirect by route template name.
+        /// </summary>
+        [HttpGet("/api/custom/go-destination")]
+        [AllowAnonymous]
+        public void Source()
+        {
+            var url = Url.RouteUrl("Destination_Route");
+            Response.Redirect(url);
+        }
+
+        /// <summary>
+        /// route with template name.
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("/api/custom/destination", Name = "Destination_Route")]
+        [AllowAnonymous]
+        public string Destination()
+        {
+            return "555";
+        }
+
 
         /// <summary>
         /// 测试 post 一个对象 + 独立参数
@@ -158,6 +209,47 @@ namespace Blog.Core.Controllers
             return Ok(new { success = true, name = name });
         }
 
+        /// <summary>
+        /// 测试http请求 RestSharp Get
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("RestsharpGet")]
+        [AllowAnonymous]
+        public TestRestSharpGetDto RestsharpGet()
+        {
+            return HttpHelper.GetApi<TestRestSharpGetDto>("http://apk.neters.club/", "api/Blog/DetailNuxtNoPer", "id=1");
+        }
+        /// <summary>
+        /// 测试http请求 RestSharp Post
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("RestsharpPost")]
+        [AllowAnonymous]
+        public TestRestSharpPostDto RestsharpPost()
+        {
+            return HttpHelper.PostApi<TestRestSharpPostDto>("http://apk.neters.club/api/Values/TestPostPara?name=老张", new { age = 18 });
+        }
+
+        /// <summary>
+        /// 测试多库连接
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("TestMutiDBAPI")]
+        [AllowAnonymous]
+        public async Task<object> TestMutiDBAPI()
+        {
+            // 从主库（Sqlite）中，操作blogs
+            var blogs = await _blogArticleServices.Query(d => d.bID == 1);
+
+            // 从从库（Sqlserver）中，获取pwds
+            var pwds = await _passwordLibServices.Query(d => d.PLID > 0);
+
+            return new
+            {
+                blogs,
+                pwds
+            };
+        }
 
         /// <summary>
         /// Put方法
