@@ -242,12 +242,11 @@
             博客管理
             </summary>
         </member>
-        <member name="M:Blog.Core.Controllers.BlogController.#ctor(Blog.Core.IServices.IBlogArticleServices,Blog.Core.Common.IRedisCacheManager,Microsoft.Extensions.Logging.ILogger{Blog.Core.Controllers.BlogController})">
+        <member name="M:Blog.Core.Controllers.BlogController.#ctor(Blog.Core.IServices.IBlogArticleServices,Microsoft.Extensions.Logging.ILogger{Blog.Core.Controllers.BlogController})">
             <summary>
             构造函数
             </summary>
             <param name="blogArticleServices"></param>
-            <param name="redisCacheManager"></param>
             <param name="logger"></param>
         </member>
         <member name="M:Blog.Core.Controllers.BlogController.Get(System.Int32,System.Int32,System.String,System.String)">
@@ -626,7 +625,7 @@
             <param name="jobId"></param>
             <returns></returns>        
         </member>
-        <member name="M:Blog.Core.Controllers.TasksQzController.ReCovery(System.Guid)">
+        <member name="M:Blog.Core.Controllers.TasksQzController.ReCovery(System.Int32)">
             <summary>
             重启一个计划任务
             </summary>
@@ -794,7 +793,7 @@
             Values控制器
             </summary>
         </member>
-        <member name="M:Blog.Core.Controllers.ValuesController.#ctor(Blog.Core.IServices.IBlogArticleServices,AutoMapper.IMapper,Blog.Core.IServices.IAdvertisementServices,Blog.Core.Model.Love,Blog.Core.IServices.IRoleModulePermissionServices,Blog.Core.Common.HttpContextUser.IUser,Blog.Core.IServices.IPasswordLibServices)">
+        <member name="M:Blog.Core.Controllers.ValuesController.#ctor(Blog.Core.IServices.IBlogArticleServices,AutoMapper.IMapper,Blog.Core.IServices.IAdvertisementServices,Blog.Core.Model.Love,Blog.Core.IServices.IRoleModulePermissionServices,Blog.Core.Common.HttpContextUser.IUser,Blog.Core.IServices.IPasswordLibServices,Blog.Core.Common.WebApiClients.HttpApis.IBlogApi)">
             <summary>
             ValuesController
             </summary>
@@ -805,6 +804,7 @@
             <param name="roleModulePermissionServices"></param>
             <param name="user"></param>
             <param name="passwordLibServices"></param>
+            <param name="blogApi"></param>
         </member>
         <member name="M:Blog.Core.Controllers.ValuesController.Get">
             <summary>
@@ -876,6 +876,12 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="M:Blog.Core.Controllers.ValuesController.WebApiClientGetAsync">
+            <summary>
+            测试http请求 WebApiClient Get
+            </summary>
+            <returns></returns>
+        </member>
         <member name="M:Blog.Core.Controllers.ValuesController.Put(System.Int32,System.String)">
             <summary>
             Put方法
@@ -888,6 +894,11 @@
             Delete方法
             </summary>
             <param name="id"></param>
+        </member>
+        <member name="T:Blog.Core.Extensions.AppConfigSetup">
+            <summary>
+            Cors 启动服务
+            </summary>
         </member>
         <member name="T:Blog.Core.Extensions.AuthorizationSetup">
             <summary>
@@ -948,6 +959,17 @@
             <summary>
             Swagger 启动服务
             </summary>
+        </member>
+        <member name="T:Blog.Core.Extensions.WebApiClientSetup">
+            <summary>
+            WebApiClientSetup 启动服务
+            </summary>
+        </member>
+        <member name="M:Blog.Core.Extensions.WebApiClientSetup.AddHttpApi(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            注册WebApiClient接口
+            </summary>
+            <param name="services"></param>
         </member>
         <member name="T:Blog.Core.Extensions.AllServicesMildd">
             <summary>
